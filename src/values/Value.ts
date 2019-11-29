@@ -1,14 +1,22 @@
 import { Animation } from "../animations/Animation";
-import { AnimationEndCallback } from "../types";
+import {
+  AnimationEndCallback,
+  SubscriptionCancelType,
+  SubscriptionType
+} from "../types";
+import { ValueNode } from "./_Value";
 
-export class Value {
+export class Value extends ValueNode {
   private value: number;
   private animation: any;
+  private uuid: number = 1;
   private startValue: number;
-  private listeners: object = {};
+  private listeners: SubscriptionType = {};
 
   constructor(value: number) {
-    this.startValue = this.value = value;
+    super();
+    this.value = value;
+    this.startValue = value;
   }
 
   getValue() {
@@ -35,5 +43,28 @@ export class Value {
 
     let onUpdate = (value: number) => this.next(value);
     animation.start(this.getValue(), onUpdate, onEnd);
+  }
+
+  stopAnimation() {
+    if (this.animation) {
+      this.animation.stop();
+      this.animation = null;
+    }
+  }
+
+  resetAnimation() {
+    this.reset();
+    this.stopAnimation();
+  }
+
+  subscribe(fn: (value: number) => void): SubscriptionCancelType {
+    let uuid = String(this.uuid++);
+    this.listeners[uuid] = fn;
+
+    return {
+      unsubscribe() {
+        delete this.listeners[uuid];
+      }
+    };
   }
 }
