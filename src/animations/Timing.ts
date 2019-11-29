@@ -13,7 +13,7 @@ export default class Timing extends Animation {
   private duration: number;
   private fromValue: number;
   private deltaTime: number;
-  private easing: (val: number) => number;
+  private easing: (value: number) => number;
 
   constructor({ delay, easing, toValue, duration }: TimingConfig) {
     super();
@@ -56,17 +56,11 @@ export default class Timing extends Animation {
      */
     if (!this.isRunning) return;
 
-    if (this.duration === 0) {
-      this.onUpdate(this.toValue);
-      return;
-    }
-
-    this.deltaTime = this.now() - this.startTime;
+    this.deltaTime = Math.floor(this.now() - this.startTime);
     let time = this.easing(this.deltaTime / this.duration);
-    let value = lerp(this.fromValue, this.toValue, time);
-    this.onUpdate(value);
+    this.onUpdate(lerp(this.fromValue, this.toValue, time));
 
-    if (this.deltaTime >= this.duration) {
+    if (this.deltaTime > this.duration) {
       this.stop();
     } else {
       this.frame = requestAnimationFrame(this.update);
@@ -74,9 +68,9 @@ export default class Timing extends Animation {
   };
 
   stop() {
-    this.timeout.clear();
     this.isRunning = false;
     cancelAnimationFrame(this.frame);
+    if (this.timeout) this.timeout.clear();
     this.end();
   }
 }

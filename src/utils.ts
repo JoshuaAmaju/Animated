@@ -18,3 +18,7 @@ export function inverseLerp(a: number, b: number, v: number): number {
 export function clamp(v: number, min: number = 0, max: number = 1): number {
   return Math.min(max, Math.max(min, v));
 }
+
+export function invariant(condition: boolean, message: string) {
+  if (condition) throw message;
+}
