@@ -70,6 +70,68 @@ class ValueNode {
     stopAnimation() { }
     resetAnimation() { }
 }
+//# sourceMappingURL=_Value.js.map
+
+function lerp(start, end, fraction) {
+    return start * (1 - fraction) + end * fraction;
+}
+function inverseLerp(a, b, v) {
+    return clamp((v - a) / (b - a));
+}
+function clamp(v, min = 0, max = 1) {
+    return Math.min(max, Math.max(min, v));
+}
+function invariant(condition, message) {
+    if (condition)
+        throw message;
+}
+function delay(func, time) {
+    let id = setTimeout(func, time);
+    return {
+        clear() {
+            clearTimeout(id);
+        }
+    };
+}
+function createInterpolation(config) {
+    let easing = config.easing || linear;
+    let input = config.inputRange;
+    let output = config.outputRange;
+    const rangeLength = input.length;
+    const finalIndex = rangeLength - 1;
+    return (v) => {
+        // If value outside minimum range, quickly return
+        // if (v <= input[0]) return output[0];
+        // // If value outside maximum range, quickly return
+        // if (v >= input[finalIndex]) return output[finalIndex];
+        let i = 1;
+        // Find index of range start
+        for (; i < rangeLength; i += 1) {
+            if (input[i] > v || i === finalIndex)
+                break;
+        }
+        const range = inverseLerp(input[i - 1], input[i], v);
+        let result = lerp(output[i - 1], output[i], easing(range));
+        return result;
+    };
+}
+//# sourceMappingURL=utils.js.map
+
+class Interpolation {
+    constructor(parent, config) {
+        this.parent = parent;
+        this.config = config;
+        this.interpolation = createInterpolation(config);
+    }
+    getValue() {
+        let parent = this.parent.getValue();
+        return this.interpolation(parent);
+    }
+    interpolate(config) {
+        return new Interpolation(this, config);
+    }
+}
+//# sourceMappingURL=Interpolation.js.map
 
 class Value extends ValueNode {
     constructor(value) {
@@ -88,6 +150,9 @@ class Value extends ValueNode {
     next(value) {
         this.value = value;
         Object.values(this.listeners).map(fn => fn(this.getValue()));
+    }
+    interpolate(config) {
+        return new Interpolation(this, config);
     }
     animate(animation, callback) {
         if (this.animation)
@@ -120,23 +185,7 @@ class Value extends ValueNode {
         };
     }
 }
-
-function delay(func, time) {
-    let id = setTimeout(func, time);
-    return {
-        clear() {
-            clearTimeout(id);
-        }
-    };
-}
-function lerp(start, end, fraction) {
-    return start * (1 - fraction) + end * fraction;
-}
-function invariant(condition, message) {
-    if (condition)
-        throw message;
-}
-//# sourceMappingURL=utils.js.map
+//# sourceMappingURL=Value.js.map
 
 class ValueXY extends ValueNode {
     constructor(x = 0, y = 0) {
@@ -176,6 +225,7 @@ class ValueXY extends ValueNode {
         };
     }
 }
+//# sourceMappingURL=ValueXY.js.map
 
 class Animation {
     constructor() {
@@ -363,6 +413,129 @@ function sequence(animations) {
 }
 //# sourceMappingURL=helpers.js.map
 
+class CSSVariables {
+    constructor(node) {
+        this.node = node || document.documentElement;
+    }
+    setVariables(variables) {
+        for (const key in variables) {
+            if (variables.hasOwnProperty(key)) {
+                const variable = variables[key];
+                let unit;
+                let value = variable;
+                if (Object.prototype.toString.call(variable) === "[object Object]" &&
+                    !(variable instanceof Value) &&
+                    !(variable instanceof Interpolation)) {
+                    value = variable.value;
+                    unit = variable.unit;
+                }
+                if (value instanceof Value) {
+                    value.subscribe(v => {
+                        this.node.style.setProperty(`--${key}`, `${v}${unit ? unit : ""}`);
+                    });
+                }
+                else if (value instanceof Interpolation) {
+                    let interpolation = value;
+                    interpolation.parent.subscribe((v) => {
+                        this.node.style.setProperty(`--${key}`, `${interpolation.getValue()}${unit ? unit : ""}`);
+                    });
+                }
+                else {
+                    this.node.style.setProperty(`--${key}`, `${value}${unit ? unit : ""}`);
+                }
+            }
+        }
+    }
+}
+//# sourceMappingURL=Variable.js.map
+
+class Transform {
+    constructor(transform) {
+        this.transform = transform;
+    }
+    isValue(value) {
+        return value instanceof Value;
+    }
+    isInterpolation(value) {
+        return value instanceof Interpolation;
+    }
+    style(node) {
+        let transforms = {};
+        let applyTransform = (key, value, unit) => {
+            let transformStr = [];
+            transforms[key] = `${value}${unit ? unit : ""}`;
+            for (const key in transforms) {
+                transformStr.push(`${key}(${transforms[key]})`);
+            }
+            node.style.transform = transformStr.join(" ");
+        };
+        for (const key in this.transform) {
+            if (this.transform.hasOwnProperty(key)) {
+                const transform = this.transform[key].value;
+                if (this.isInterpolation(transform)) {
+                    let parent = transform.parent;
+                    let unit = this.transform[key].unit;
+                    parent.subscribe((v) => {
+                        let value = transform.getValue();
+                        applyTransform(key, value, unit);
+                    });
+                }
+                else if (this.isValue(transform)) {
+                    let unit = this.transform[key].unit;
+                    transform.subscribe((v) => applyTransform(key, v, unit));
+                }
+                else {
+                    let unit = this.transform[key].unit;
+                    applyTransform(key, transform, unit);
+                }
+            }
+        }
+    }
+}
+//# sourceMappingURL=Transform.js.map
+
+class Style {
+    constructor(node) {
+        this.node = node;
+    }
+    setStyle(styles) {
+        let transform = styles.transform;
+        this.node.style.willChange = Object.keys(styles).join(",");
+        if (transform) {
+            new Transform(transform).style(this.node);
+            delete styles.transform;
+        }
+        for (const key in styles) {
+            if (styles.hasOwnProperty(key)) {
+                let unit;
+                const style = styles[key];
+                let value = style;
+                if (Object.prototype.toString.call(style) === "[object Object]" &&
+                    !(style instanceof Value) &&
+                    !(style instanceof Interpolation)) {
+                    value = style.value;
+                    unit = style.unit;
+                }
+                if (value instanceof Value) {
+                    value.subscribe((v) => {
+                        this.node.setAttribute("style", `${key}: ${v}${unit ? unit : ""}`);
+                    });
+                }
+                else if (value instanceof Interpolation) {
+                    let interpolation = value;
+                    interpolation.parent.subscribe((v) => {
+                        this.node.setAttribute("style", `${key}: ${interpolation.getValue()}${unit ? unit : ""}`);
+                    });
+                }
+                else {
+                    this.node.setAttribute("style", `${key}: ${value}${unit ? unit : ""}`);
+                }
+            }
+        }
+    }
+}
+//# sourceMappingURL=Style.js.map
+
 function useValue(values) {
     let valuesObj = {};
     for (const key in values) {
@@ -377,8 +550,8 @@ function useValue(values) {
     return valuesObj;
 }
 function useTransition(transitions, config) {
-    let animations = [];
     let transitionsObj = {};
+    let animations = [];
     const start = () => {
         parallel(animations).start();
     };
@@ -399,6 +572,52 @@ function useTransition(transitions, config) {
         }
     }
     return Object.assign(Object.assign({}, transitionsObj), { start, reset, transitions: animations });
+    // const applyTransitions = (transitions: TransitionType) => {
+    //   let transitionsObj: any = {};
+    //   let animations: ComposedAnimation[] = [];
+    //   const start = () => {
+    //     parallel(animations).start();
+    //   };
+    //   const reset = () => {
+    //     animations.forEach(animation => {
+    //       animation.reset();
+    //     });
+    //   };
+    //   for (const key in transitions) {
+    //     if (transitions.hasOwnProperty(key)) {
+    //       let transition: any = transitions[key];
+    //       let {
+    //         to: toValue,
+    //         from: startValue,
+    //         config: internalConfig
+    //       } = transition;
+    //       invariant(
+    //         !(startValue instanceof ValueNode),
+    //         "{from} should be of type Value or ValueXY"
+    //       );
+    //       let newConfig: any = internalConfig || { ...config, toValue };
+    //       let animation = timing(startValue, newConfig);
+    //       transitionsObj[key] = animation;
+    //       animations.push(animation);
+    //     }
+    //   }
+    //   return { ...transitionsObj, start, reset, transitions: animations };
+    // };
+    // if (typeof transitions === "function") {
+    //   let _transitions: any = transitions;
+    //   return (value: any) => {
+    //     let _trans = _transitions()(value);
+    //     return applyTransitions(_trans);
+    //   };
+    // } else {
+    //   return applyTransitions(transitions);
+    // }
+}
+function useVariables(variables, element) {
+    new CSSVariables(element).setVariables(variables);
+}
+function useStyle(element, styles) {
+    new Style(element).setStyle(styles);
 }
 
 const Animated = {
@@ -407,9 +626,11 @@ const Animated = {
     timing,
     ValueXY,
     stagger,
+    useStyle,
     parallel,
     sequence,
     useValue,
+    useVariables,
     useTransition
 };
 //# sourceMappingURL=animated.js.map

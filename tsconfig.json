@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
-    "declaration": true,
-    "declarationDir": "./dist",
+    "target": "es6",
     "module": "es6",
-    "noImplicitAny": true,
-    "lib": ["es2017", "es7", "es6", "dom"],
     "outDir": "./dist",
-    "target": "es6"
+    "declaration": true,
+    "noImplicitAny": true,
+    "declarationDir": "./dist",
+    "lib": ["es2017", "es7", "es6", "dom"]
   },
   "typeDocOptions": {
     "mode": "modules",

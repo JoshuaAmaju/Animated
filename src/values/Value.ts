@@ -2,9 +2,11 @@ import { Animation } from "../animations/Animation";
 import {
   AnimationEndCallback,
   SubscriptionCancelType,
-  SubscriptionType
+  SubscriptionType,
+  InterpolationConfig
 } from "../types";
 import { ValueNode } from "./_Value";
+import { Interpolation } from "../Interpolation";
 
 export class Value extends ValueNode {
   private value: number;
@@ -30,6 +32,10 @@ export class Value extends ValueNode {
   next(value: number): void {
     this.value = value;
     Object.values(this.listeners).map(fn => fn(this.getValue()));
+  }
+
+  interpolate(config: InterpolationConfig) {
+    return new Interpolation(this, config);
   }
 
   animate(animation: Animation, callback?: AnimationEndCallback) {
