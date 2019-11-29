@@ -1,0 +1,25 @@
+{
+  "license": "MIT",
+  "name": "animated",
+  "version": "0.0.1",
+  "main": "index.js",
+  "module": "dist/animated.esm.js",
+  "browser": "dist/animated.umd.js",
+  "author": "Joshua Amaju <princejosh0007@gmail.com>",
+  "repository": "https://github.com/JoshuaAmaju/animated.git",
+  "description": "Experimental re-make of react animated/spring for non framework usage.",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w"
+  },
+  "devDependencies": {
+    "tslib": "^1.10.0",
+    "rollup": "^1.27.5",
+    "typescript": "^3.7.2",
+    "rollup-plugin-serve": "^1.0.1",
+    "rollup-plugin-typescript": "^1.0.1"
+  }
+}
