@@ -3,8 +3,8 @@ import serve from "rollup-plugin-serve";
 import typescript from "rollup-plugin-typescript";
 
 const plugins = [
-  typescript(),
-  serve({ open: true, contentBase: "./example", port: 4000 })
+  typescript()
+  // serve({ open: true, contentBase: "./example", port: 4000 })
 ];
 
 export default [
